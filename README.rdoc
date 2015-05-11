@@ -1,6 +1,6 @@
 = kiss-rest-client
 
-Ruby simple rest client for communication with external APIs
+Simple ruby rest client for communication with external APIs
 
 *** Under development ***
 
