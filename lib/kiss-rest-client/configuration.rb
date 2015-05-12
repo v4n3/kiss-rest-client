@@ -27,11 +27,17 @@ module KissRestClient
       end
 
       def headers(key = nil, value = nil)
+
         if key.nil? && value.nil?
           @@headers
         else
           @@headers ||= {}
-          @@headers[key] = value
+
+          if key.is_a?(Hash)
+            @@headers.merge!(key)
+          else
+            @@headers[key] = value
+          end
         end
       end
 
