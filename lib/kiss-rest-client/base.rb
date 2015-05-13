@@ -1,6 +1,7 @@
 module KissRestClient
   class Base
     include Configuration
+    include Caching
     include HttpClient
 
     def initialize(attrs={})

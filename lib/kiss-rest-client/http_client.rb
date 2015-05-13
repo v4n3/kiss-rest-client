@@ -1,27 +1,43 @@
 module KissRestClient
   module HttpClient
     module ClassMethods
-      def get(url: nil, body: {}, query: {}, headers: {}, **options)
-        handle_response HTTParty.get(prepare_url(url), prepare_call_options(body, query, headers, options))
+      def get(**options)
+        request(:get, options)
       end
 
-      def post(url: nil, body: {}, query: {}, headers: {}, **options)
-        handle_response HTTParty.post(prepare_url(url), prepare_call_options(body, query, headers, options))
+      def post(**options)
+        request(:post, options)
       end
 
-      def put(url: nil, body: {}, query: {}, headers: {}, **options)
-        handle_response HTTParty.put(prepare_url(url), prepare_call_options(body, query, headers, options))
+      def put(**options)
+        request(:put, options)
       end
 
-      def patch(url: nil, body: {}, query: {}, headers: {}, **options)
-        handle_response HTTParty.patch(prepare_url(url), prepare_call_options(body, query, headers, options))
+      def patch(**options)
+        request(:patch, options)
       end
 
-      def delete(url: nil, body: {}, query: {}, headers: {}, **options)
-        handle_response HTTParty.delete(prepare_url(url), prepare_call_options(body, query, headers, options))
+      def delete(**options)
+        request(:delete, options)
       end
 
       private
+
+      def request(method, url: nil, body:{}, query: {}, headers: {}, **options)
+        path = prepare_url(url)
+
+        cached_response = read_cache(path)
+        if cached_response && cached_response["etag"]
+            headers["If-None-Match"] = cached_response["etag"]
+        end
+
+        call_options = prepare_call_options(body, query, headers, options)
+        response = HTTParty.send method, path, call_options
+
+        write_cache(path, response)
+
+        handle_response response, cached_response
+      end
 
       def prepare_call_options(body, query, headers, options)
         # Prepare http request params
@@ -47,32 +63,34 @@ module KissRestClient
         full_url += '/' + url if url
       end
 
-      def handle_response(response)
+      def handle_response(response, cached_response)
             case response.code.to_i
             when 301, 302, 303, 307
-                raise(KissRestClient::Redirection.new(response))
+              raise(KissRestClient::Redirection.new(response))
+            when 304
+              cached_response["parsed_response"]
             when 200...400
-                response.parsed_response
+              response.parsed_response
             when 400
-                raise(KissRestClient::BadRequest.new(response))
+              raise(KissRestClient::BadRequest.new(response))
             when 401
-                raise(KissRestClient::UnauthorizedAccess.new(response))
+              raise(KissRestClient::UnauthorizedAccess.new(response))
             when 403
-                raise(KissRestClient::ForbiddenAccess.new(response))
+              raise(KissRestClient::ForbiddenAccess.new(response))
             when 404
-                raise(KissRestClient::ResourceNotFound.new(response))
+              raise(KissRestClient::ResourceNotFound.new(response))
             when 405
-                raise(KissRestClient::MethodNotAllowed.new(response))
+              raise(KissRestClient::MethodNotAllowed.new(response))
             when 409
-                raise(KissRestClient::ResourceConflict.new(response))
+              raise(KissRestClient::ResourceConflict.new(response))
             when 422
-                raise(KissRestClient::ResourceInvalid.new(response))
+              raise(KissRestClient::ResourceInvalid.new(response))
             when 401...500
-                raise(KissRestClient::ClientError.new(response))
+              raise(KissRestClient::ClientError.new(response))
             when 500...600
-                raise(KissRestClient::ServerError.new(response))
+              raise(KissRestClient::ServerError.new(response))
             else
-                raise(KissRestClient::ConnectionError.new(response, "Unknown response code: #{response.code}"))
+              raise(KissRestClient::ConnectionError.new(response, "Unknown response code: #{response.code}"))
             end
         end
     end
